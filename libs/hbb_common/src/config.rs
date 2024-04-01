@@ -317,7 +317,11 @@ pub struct PeerConfig {
     pub custom_resolutions: HashMap<String, Resolution>,
 
     // The other scalar value must before this
-    #[serde(default, deserialize_with = "PeerConfig::deserialize_options")]
+    #[serde(
+        default,
+        deserialize_with = "deserialize_hashmap_string_string",
+        skip_serializing_if = "HashMap::is_empty"
+    )]
     pub options: HashMap<String, String>, // not use delete to represent default values
     // Various data for flutter ui
     #[serde(default, deserialize_with = "deserialize_hashmap_string_string")]
@@ -863,6 +867,7 @@ impl Config {
         }
         let mut config = Config::load_::<Config>("");
         if config.key_pair.0.is_empty() {
+            log::info!("Generated new keypair for id: {}", config.id);
             let (pk, sk) = sign::gen_keypair();
             let key_pair = (sk.0.to_vec(), pk.0.into());
             config.key_pair = key_pair.clone();
@@ -1009,6 +1014,11 @@ impl Config {
 
     pub fn get_socks() -> Option<Socks5Server> {
         CONFIG2.read().unwrap().socks.clone()
+    }
+
+    #[inline]
+    pub fn is_proxy() -> bool {
+        Self::get_network_type() != NetworkType::Direct
     }
 
     pub fn get_network_type() -> NetworkType {
@@ -1225,22 +1235,8 @@ impl PeerConfig {
         }
     }
 
-    fn deserialize_options<'de, D>(deserializer: D) -> Result<HashMap<String, String>, D::Error>
-    where
-        D: de::Deserializer<'de>,
-    {
-        let mut mp: HashMap<String, String> = de::Deserialize::deserialize(deserializer)?;
-        Self::insert_default_options(&mut mp);
-        Ok(mp)
-    }
-
     fn default_options() -> HashMap<String, String> {
         let mut mp: HashMap<String, String> = Default::default();
-        Self::insert_default_options(&mut mp);
-        return mp;
-    }
-
-    fn insert_default_options(mp: &mut HashMap<String, String>) {
         [
             "codec-preference",
             "custom-fps",
@@ -1250,10 +1246,9 @@ impl PeerConfig {
             "swap-left-right-mouse",
         ]
         .map(|key| {
-            if !mp.contains_key(key) {
-                mp.insert(key.to_owned(), UserDefaultConfig::read(key));
-            }
+            mp.insert(key.to_owned(), UserDefaultConfig::read(key));
         });
+        mp
     }
 }
 
@@ -1678,13 +1673,19 @@ pub struct AbPeer {
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
-pub struct Ab {
+pub struct AbEntry {
     #[serde(
         default,
         deserialize_with = "deserialize_string",
         skip_serializing_if = "String::is_empty"
     )]
-    pub access_token: String,
+    pub guid: String,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_string",
+        skip_serializing_if = "String::is_empty"
+    )]
+    pub name: String,
     #[serde(default, deserialize_with = "deserialize_vec_abpeer")]
     pub peers: Vec<AbPeer>,
     #[serde(default, deserialize_with = "deserialize_vec_string")]
@@ -1695,6 +1696,24 @@ pub struct Ab {
         skip_serializing_if = "String::is_empty"
     )]
     pub tag_colors: String,
+}
+
+impl AbEntry {
+    pub fn personal(&self) -> bool {
+        self.name == "My address book" || self.name == "Legacy address book"
+    }
+}
+
+#[derive(Debug, Default, Serialize, Deserialize, Clone)]
+pub struct Ab {
+    #[serde(
+        default,
+        deserialize_with = "deserialize_string",
+        skip_serializing_if = "String::is_empty"
+    )]
+    pub access_token: String,
+    #[serde(default, deserialize_with = "deserialize_vec_abentry")]
+    pub ab_entries: Vec<AbEntry>,
 }
 
 impl Ab {
@@ -1709,6 +1728,7 @@ impl Ab {
             let max_len = 64 * 1024 * 1024;
             if data.len() > max_len {
                 // maxlen of function decompress
+                log::error!("ab data too large, {} > {}", data.len(), max_len);
                 return;
             }
             if let Ok(data) = symmetric_crypt(&data, true) {
@@ -1858,6 +1878,7 @@ deserialize_default!(deserialize_vec_string, Vec<String>);
 deserialize_default!(deserialize_vec_i32_string_i32, Vec<(i32, String, i32)>);
 deserialize_default!(deserialize_vec_discoverypeer, Vec<DiscoveryPeer>);
 deserialize_default!(deserialize_vec_abpeer, Vec<AbPeer>);
+deserialize_default!(deserialize_vec_abentry, Vec<AbEntry>);
 deserialize_default!(deserialize_vec_groupuser, Vec<GroupUser>);
 deserialize_default!(deserialize_vec_grouppeer, Vec<GroupPeer>);
 deserialize_default!(deserialize_keypair, KeyPair);

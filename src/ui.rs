@@ -576,8 +576,8 @@ impl UI {
         has_hwcodec()
     }
 
-    fn has_gpucodec(&self) -> bool {
-        has_gpucodec()
+    fn has_vram(&self) -> bool {
+        has_vram()
     }
 
     fn get_langs(&self) -> String {
@@ -620,6 +620,10 @@ impl UI {
             hbb_common::sodiumoxide::base64::Variant::Original,
         );
         format!("data:image/png;base64,{s}")
+    }
+
+    pub fn check_hwcodec(&self) {
+        check_hwcodec()
     }
 }
 
@@ -701,7 +705,7 @@ impl sciter::EventHandler for UI {
         fn get_lan_peers();
         fn get_uuid();
         fn has_hwcodec();
-        fn has_gpucodec();
+        fn has_vram();
         fn get_langs();
         fn default_video_save_directory();
         fn handle_relay_id(String);
@@ -711,6 +715,7 @@ impl sciter::EventHandler for UI {
         fn generate2fa();
         fn generate_2fa_img_src(String);
         fn verify2fa(String);
+        fn check_hwcodec();
     }
 }
 

@@ -1,6 +1,9 @@
 name: Clear cache
 
 on:
+  schedule:
+    # schedule build every night
+    - cron: "50 23 * * *"
   workflow_dispatch:
 
 permissions:
